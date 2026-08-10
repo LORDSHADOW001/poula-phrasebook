@@ -4,23 +4,41 @@ import Header from './components/Header.jsx'
 import SearchBar from './components/SearchBar.jsx'
 import EntryList from './components/EntryList.jsx'
 import AddEntryForm from './components/AddEntryForm.jsx'
+import AdminGate from './components/AdminGate.jsx'
+import ProgressStat from './components/ProgressStat.jsx'
 
 export default function App() {
   const [entries, setEntries] = useState([])
+  const [totalCount, setTotalCount] = useState(null)
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [error, setError] = useState(null)
   const [contributorName, setContributorName] = useState(
     () => localStorage.getItem('poula_contributor_name') || ''
   )
+  const [adminUnlocked, setAdminUnlocked] = useState(
+    () => sessionStorage.getItem('poula_admin_unlocked') === 'true'
+  )
+  const [showAdminGate, setShowAdminGate] = useState(false)
 
   useEffect(() => {
     localStorage.setItem('poula_contributor_name', contributorName)
   }, [contributorName])
 
   useEffect(() => {
-    fetchEntries()
+    fetchCount()
   }, [])
+
+  useEffect(() => {
+    if (adminUnlocked) fetchEntries()
+  }, [adminUnlocked])
+
+  async function fetchCount() {
+    const { count, error } = await supabase
+      .from('entries')
+      .select('*', { count: 'exact', head: true })
+    if (!error) setTotalCount(count)
+  }
 
   async function fetchEntries() {
     setLoading(true)
@@ -49,8 +67,6 @@ export default function App() {
 
       if (uploadError) {
         setError(`Audio upload failed: ${uploadError.message}`)
-        // Still save the text entry even if the audio upload failed —
-        // don't lose the phrase over a recording problem.
       } else {
         const { data: urlData } = supabase.storage.from('audio').getPublicUrl(fileName)
         audio_url = urlData.publicUrl
@@ -67,6 +83,7 @@ export default function App() {
       return
     }
     setEntries((prev) => [data[0], ...prev])
+    setTotalCount((prev) => (prev == null ? prev : prev + 1))
   }
 
   async function handleVerify(id) {
@@ -94,6 +111,39 @@ export default function App() {
     )
   }, [entries, query])
 
+  if (adminUnlocked) {
+    return (
+      <div className="page">
+        <Header variant="admin" />
+        <main className="main main--admin">
+          {error && (
+            <div className="error-banner">
+              Something went wrong talking to the database: {error}
+            </div>
+          )}
+          <section className="browse-section">
+            <SearchBar value={query} onChange={setQuery} />
+            <p className="count-text">
+              {loading ? '\u00A0' : `${filteredEntries.length} phrase${filteredEntries.length === 1 ? '' : 's'}`}
+            </p>
+            <EntryList entries={filteredEntries} loading={loading} onVerify={handleVerify} />
+          </section>
+        </main>
+        <footer className="footer">
+          <button
+            className="footer-link"
+            onClick={() => {
+              sessionStorage.removeItem('poula_admin_unlocked')
+              setAdminUnlocked(false)
+            }}
+          >
+            Exit admin view
+          </button>
+        </footer>
+      </div>
+    )
+  }
+
   return (
     <div className="page">
       <Header />
@@ -107,13 +157,7 @@ export default function App() {
           </div>
         )}
 
-        <section className="browse-section">
-          <SearchBar value={query} onChange={setQuery} />
-          <p className="count-text">
-            {loading ? '\u00A0' : `${filteredEntries.length} phrase${filteredEntries.length === 1 ? '' : 's'}`}
-          </p>
-          <EntryList entries={filteredEntries} loading={loading} onVerify={handleVerify} />
-        </section>
+        <ProgressStat count={totalCount} />
 
         <section className="add-section">
           <AddEntryForm
@@ -126,6 +170,13 @@ export default function App() {
 
       <footer className="footer">
         <p>A living record of Poula, made by its speakers.</p>
+        {showAdminGate ? (
+          <AdminGate onUnlock={() => setAdminUnlocked(true)} />
+        ) : (
+          <button className="footer-link" onClick={() => setShowAdminGate(true)}>
+            Admin
+          </button>
+        )}
       </footer>
     </div>
   )
