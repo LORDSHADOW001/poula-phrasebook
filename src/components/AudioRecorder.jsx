@@ -1,12 +1,21 @@
 import { useRef, useState } from 'react'
 
-/**
- * A small recorder control. Calls onRecordingComplete(blob) once the
- * person stops recording. Records in webm/opus where supported, which
- * every modern browser (including mobile Safari 14.5+/Chrome/Firefox) can play back.
- */
+const CANDIDATE_MIME_TYPES = [
+  'audio/webm;codecs=opus',
+  'audio/webm',
+  'audio/mp4',
+  'audio/aac',
+]
+
+function pickSupportedMimeType() {
+  if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) {
+    return ''
+  }
+  return CANDIDATE_MIME_TYPES.find((type) => MediaRecorder.isTypeSupported(type)) || ''
+}
+
 export default function AudioRecorder({ onRecordingComplete, onClear }) {
-  const [status, setStatus] = useState('idle') // idle | recording | recorded | error
+  const [status, setStatus] = useState('idle')
   const [previewUrl, setPreviewUrl] = useState(null)
   const [errorMsg, setErrorMsg] = useState('')
   const mediaRecorderRef = useRef(null)
@@ -20,7 +29,10 @@ export default function AudioRecorder({ onRecordingComplete, onClear }) {
       streamRef.current = stream
       chunksRef.current = []
 
-      const recorder = new MediaRecorder(stream)
+      const mimeType = pickSupportedMimeType()
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream)
       mediaRecorderRef.current = recorder
 
       recorder.ondataavailable = (e) => {
@@ -28,7 +40,8 @@ export default function AudioRecorder({ onRecordingComplete, onClear }) {
       }
 
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'audio/webm' })
+        const actualType = recorder.mimeType || mimeType || 'audio/webm'
+        const blob = new Blob(chunksRef.current, { type: actualType })
         const url = URL.createObjectURL(blob)
         setPreviewUrl(url)
         setStatus('recorded')
@@ -40,9 +53,7 @@ export default function AudioRecorder({ onRecordingComplete, onClear }) {
       setStatus('recording')
     } catch (err) {
       setStatus('error')
-      setErrorMsg(
-        'Could not access the microphone. Check your browser allows microphone access for this site.'
-      )
+      setErrorMsg('Could not access the microphone. Check your browser allows microphone access for this site.')
     }
   }
 
@@ -63,13 +74,11 @@ export default function AudioRecorder({ onRecordingComplete, onClear }) {
           🎙 Record pronunciation
         </button>
       )}
-
       {status === 'recording' && (
         <button type="button" className="audio-btn audio-btn--stop" onClick={stopRecording}>
           ● Recording… tap to stop
         </button>
       )}
-
       {status === 'recorded' && previewUrl && (
         <div className="audio-preview">
           <audio controls src={previewUrl} />
@@ -78,7 +87,6 @@ export default function AudioRecorder({ onRecordingComplete, onClear }) {
           </button>
         </div>
       )}
-
       {status === 'error' && <p className="audio-error">{errorMsg}</p>}
     </div>
   )

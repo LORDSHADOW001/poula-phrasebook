@@ -60,10 +60,15 @@ export default function App() {
     let audio_url = null
 
     if (audioBlob) {
-      const fileName = `${crypto.randomUUID()}.webm`
+      const extension = audioBlob.type.includes('mp4')
+        ? 'm4a'
+        : audioBlob.type.includes('webm')
+          ? 'webm'
+          : 'audio'
+      const fileName = `${crypto.randomUUID()}.${extension}`
       const { error: uploadError } = await supabase.storage
         .from('audio')
-        .upload(fileName, audioBlob, { contentType: 'audio/webm' })
+        .upload(fileName, audioBlob, { contentType: audioBlob.type || 'application/octet-stream' })
 
       if (uploadError) {
         setError(`Audio upload failed: ${uploadError.message}`)
