@@ -1,6 +1,7 @@
+cat > src/components/ProgressStat.jsx << 'EOF'
 import { useEffect, useState } from 'react'
 
-export default function ProgressStat({ count, milestone = 200 }) {
+export default function ProgressStat({ count }) {
   const [display, setDisplay] = useState(0)
 
   useEffect(() => {
@@ -21,22 +22,12 @@ export default function ProgressStat({ count, milestone = 200 }) {
 
   if (count == null) return null
 
-  const pct = Math.min((count / milestone) * 100, 100)
-
   return (
     <div className="progress-stat">
       <div className="progress-stat__row">
         <span className="progress-stat__count">{display}</span>
         <span className="progress-stat__label">phrases collected so far</span>
       </div>
-      <div className="progress-stat__bar">
-        <div className="progress-stat__bar-fill" style={{ width: `${pct}%` }} />
-      </div>
-      <p className="progress-stat__milestone">
-        {count >= milestone
-          ? `Past our first goal of ${milestone} — thank you.`
-          : `${milestone - count} more to reach our first goal of ${milestone}`}
-      </p>
     </div>
   )
 }
