@@ -1,4 +1,3 @@
-cat > src/components/ProgressStat.jsx << 'EOF'
 import { useEffect, useState } from 'react'
 
 export default function ProgressStat({ count }) {
